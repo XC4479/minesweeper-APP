@@ -2,9 +2,8 @@ import flet as ft
 import random
 import asyncio
 
-# ==========================================
-# 1. 核心邏輯 (MinesweeperLogic)
-# ==========================================
+
+# 1. 邏輯 
 class MinesweeperLogic:
     def __init__(self, rows, cols, mines, lives):
         self.rows = rows
@@ -16,20 +15,21 @@ class MinesweeperLogic:
         self.revealed = set()
         self.flags = set()
         self.game_over = False
-
+    #佈雷
     def initialize_board(self, safe_r, safe_c):
         self.grid = [[0 for i in range(self.cols)] for i in range(self.rows)]
         candidates = []
+        #可佈雷區
         for r in range(self.rows):
             for c in range(self.cols):
                 if abs(r - safe_r) <= 1 and abs(c - safe_c) <= 1:
                     continue
                 candidates.append((r, c))
-
+        #隨機佈雷
         mine_positions = random.sample(candidates, self.total_mines)
         for (r, c) in mine_positions:
             self.grid[r][c] = -1
-
+        #周圍有幾顆雷
         directions = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
         for r in range(self.rows):
             for c in range(self.cols):
@@ -44,26 +44,23 @@ class MinesweeperLogic:
     def get_cell_value(self, r, c):
         return self.grid[r][c]
 
-# ==========================================
-# 2. Flet 遊戲主程式
-# ==========================================
+
+#主程式
 class GameApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.page.title = "Flet 手機版踩地雷"
         self.page.theme_mode = ft.ThemeMode.LIGHT
-        self.page.padding = 10
-        self.page.scroll = "adaptive"
+        self.page.padding = 5
+        self.page.scroll = "adaptive" # 如果內容太多，允許捲動
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
-        # 遊戲變數
         self.logic = None
         self.timer_task = None
         self.time_left = 0
         self.buttons_grid = []
         self.timer_running = False 
 
-        # 顏色代碼
         self.text_colors = {
             1: ft.Colors.BLUE, 2: ft.Colors.GREEN, 3: ft.Colors.RED,
             4: ft.Colors.INDIGO, 5: ft.Colors.BROWN, 6: ft.Colors.TEAL,
@@ -74,17 +71,16 @@ class GameApp:
         self.header_text = ft.Text("💣 手機版踩地雷", size=24, weight=ft.FontWeight.BOLD)
         self.status_text = ft.Text("請選擇難度", size=18, color=ft.Colors.BLUE)
         self.lives_text = ft.Text("", size=18, color=ft.Colors.RED)
-        self.game_container = ft.Container() 
+        self.game_container = ft.Container() #格子
 
         self.show_menu()
 
     def show_menu(self):
-        """顯示選單畫面"""
         self.cancel_timer()
         self.page.clean()
         self.page.vertical_alignment = ft.MainAxisAlignment.CENTER
         
-        # 建立 async handler 確保按鈕點擊後能正確執行邏輯
+        # 建立 async handler 執行各級按鈕
         def create_start_handler(rows, cols, mines, limit, lives):
             async def handler(e):
                 self.start_game(rows, cols, mines, limit, lives)
@@ -112,21 +108,22 @@ class GameApp:
         )
 
     def start_game(self, rows, cols, mines, limit, lives):
-        """開始遊戲初始化"""
+        #畫格子
         self.logic = MinesweeperLogic(rows, cols, mines, lives)
         self.time_left = limit
         self.status_text.value = f"⏳ {self.time_left} (點擊開始)"
         self.lives_text.value = f"❤️ {self.logic.lives}"
         self.timer_running = False 
-        
+
+        #for按鈕
         self.buttons_grid = [[None for _ in range(cols)] for _ in range(rows)]
-        cell_size = 35 if cols < 10 else 28 
+        cell_size = 35 if cols < 10 else 25 
         
-        controls = []
+        controls = [] #暫存
         for r in range(rows):
             row_controls = []
             for c in range(cols):
-                
+                #handler
                 def make_click_handler(row, col):
                     async def handler(e):
                         await self.on_click(row, col)
@@ -157,7 +154,7 @@ class GameApp:
         self.game_container.content = ft.Column(controls=controls, spacing=2, alignment=ft.MainAxisAlignment.CENTER)
         
         self.page.clean()
-        self.page.vertical_alignment = ft.MainAxisAlignment.START
+        self.page.vertical_alignment = ft.MainAxisAlignment.CENTER
         self.page.add(
             ft.Row([
                 ft.ElevatedButton("🔙 返回", on_click=lambda e: self.show_menu()),
@@ -169,11 +166,11 @@ class GameApp:
         )
 
     def start_timer(self):
-        """啟動計時器任務"""
         if self.timer_task: 
             self.timer_task.cancel()
         self.timer_running = True
         self.timer_task = asyncio.create_task(self.timer_loop())
+        #背景讀秒
 
     def cancel_timer(self):
         if self.timer_task:
@@ -197,7 +194,7 @@ class GameApp:
     async def on_click(self, r, c):
         if self.logic.game_over or (r, c) in self.logic.flags: return
         
-        # 第一次點擊時才初始化地圖並開始計時
+        # 第一次點擊開始計時
         if self.logic.grid is None:
             self.logic.initialize_board(r, c)
             self.start_timer() 
@@ -215,7 +212,7 @@ class GameApp:
                 btn.content.value = "💣"
                 btn.update()
                 
-                # SnackBar 提示使用 page.open
+                # SnackBar
                 snack = ft.SnackBar(ft.Text(f"💥 踩到地雷！剩餘命數: {self.logic.lives}"), bgcolor=ft.Colors.RED)
                 self.page.open(snack) 
                 self.page.update()
@@ -260,7 +257,7 @@ class GameApp:
         if val > 0:
             btn.content.value = str(val)
             btn.content.color = self.text_colors.get(val, ft.Colors.BLACK)
-        
+        #掀開0周圍8格
         if val == 0:
             directions = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
             for dr, dc in directions:
@@ -300,7 +297,6 @@ class GameApp:
         await self.game_over_sequence(win=False, explode_pos=(r, c), reason="踩到地雷")
 
     async def game_over_sequence(self, win, explode_pos=None, reason=""):
-        """遊戲結束結算，並彈出通知視窗"""
         self.logic.game_over = True
         self.cancel_timer()
         
@@ -318,7 +314,7 @@ class GameApp:
                             btn.content.color = ft.Colors.WHITE
             self.page.update()
 
-        # API page.open() ---
+        
         title_color = ft.Colors.GREEN if win else ft.Colors.RED
         title_text = "🎉 恭喜獲勝！" if win else "💀 遊戲結束"
         
@@ -328,37 +324,29 @@ class GameApp:
             ft.Text(f"剩餘時間: {self.time_left} 秒", size=16),
         ], height=100, tight=True)
 
+        async def on_return_click(e):
+            await self.close_dlg_and_menu(dlg)
+
         dlg = ft.AlertDialog(
             modal=True,
             title=ft.Text(title_text, color=title_color, weight=ft.FontWeight.BOLD),
             content=content_column,
             actions=[
-                ft.TextButton("回到選單", on_click=lambda e: self.close_dlg_and_menu(dlg)),
-            ],
+                ft.TextButton("回到選單", on_click=on_return_click),
+                #ft.TextButton("回到選單", on_click=self.close_dlg_and_menu),
+                    ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        
         self.page.open(dlg)
 
-    
-    def close_dlg_and_menu(self, dlg):
-        # 1. 先關閉對話框
+    async def close_dlg_and_menu(self, dlg):
         self.page.close(dlg)
-        
-        # 2. 【關鍵修正】強制更新頁面，確保對話框在視覺上真的消失
-        self.page.update()
-        
-        # 3. 對話框消失後，再重建選單
+        await asyncio.sleep(0.1)
         self.show_menu()
 
-# ==========================================
-# 3. 程式入口
-# ==========================================
+#開始
 async def main(page: ft.Page):
     app = GameApp(page)
 
-if __name__ == "__main__":
-    # 強制使用瀏覽器模式，避免防火牆或本地視窗沒跳出來的問題
-    #ft.app(target=main, view=ft.AppView.WEB_BROWSER)
-    
+if __name__ == "__main__":  
     ft.app(target=main)
